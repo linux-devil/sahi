@@ -139,6 +139,9 @@ def get_sliced_prediction(
     auto_slice_resolution: bool = True,
     slice_export_prefix: str = None,
     slice_dir: str = None,
+    min_area: float = None,  # Add this parameter
+    max_area: float = None,  # Add this parameter
+    **kwargs
 ) -> PredictionResult:
     """
     Function for slice image + get predicion for each slice + combine predictions in full image.
@@ -232,6 +235,13 @@ def get_sliced_prediction(
         class_agnostic=postprocess_class_agnostic,
     )
 
+    def area_filter(predictions):
+        return [
+            pred for pred in predictions
+            if (min_area is None or pred.bbox.area >= min_area) and
+               (max_area is None or pred.bbox.area <= max_area)
+        ]
+    
     # create prediction input
     num_group = int(num_slices / num_batch)
     if verbose == 1 or verbose == 2:
@@ -255,6 +265,9 @@ def get_sliced_prediction(
                 slice_image_result.original_image_width,
             ],
         )
+        #Apply Area filter
+        prediction_result.object_prediction_list = area_filter(prediction_result.object_prediction_list)
+
         # convert sliced predictions to full predictions
         for object_prediction in prediction_result.object_prediction_list:
             if object_prediction:  # if not empty
@@ -284,7 +297,7 @@ def get_sliced_prediction(
 
     time_end = time.time() - time_start
     durations_in_seconds["prediction"] = time_end
-
+    object_prediction_list = area_filter(object_prediction_list)
     if verbose == 2:
         print(
             "Slicing performed in",
